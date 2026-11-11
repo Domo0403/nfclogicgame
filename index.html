@@ -45,9 +45,11 @@ ol{padding-left:1.3em;margin:.4em 0}
 <main id="app"></main>
 <script>
 const KEY='missing-number-v1';
+const DEV=new URLSearchParams(location.search).has('dev');
+const store=DEV?sessionStorage:localStorage;
 let S=load(),hidden=false,err='',toast='';
-function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{return JSON.parse(store.getItem(KEY))}catch(e){return null}}
+function save(){try{store.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function chk(s){const d=s.split('').map(Number);return(d[0]*3+d[1]*7+d[2]*3+d[3]*7+d[4]*3)%10}
 function mkCode(){const s=String(Math.floor(Math.random()*100000)).padStart(5,'0');return s+chk(s)}
 function valid(c){return/^\d{6}$/.test(c)&&chk(c.slice(0,5))===+c[5]}
@@ -60,6 +62,22 @@ function log(m){S.log.push({t:Date.now(),m})}
 function clock(t){const d=new Date(t);return[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':')}
 function fmt(ms){const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 const $=id=>document.getElementById(id);
+let ctx=null,muted=false,lastSec=-1;
+function initAudio(){try{if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume()}catch(e){}}
+function beep(f,d,v,type,delay){if(muted||!ctx||ctx.state!=='running')return;const o=ctx.createOscillator(),g=ctx.createGain(),t=ctx.currentTime+(delay||0);
+  o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+d)}
+function vib(p){try{if(!muted&&navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+function tickSound(sec){
+  if(sec>10)beep(520,.04,.05,'square');
+  else if(sec>5){beep(660,.09,.2,'square');vib(40)}
+  else{beep(880,.09,.28,'square');beep(880,.09,.28,'square',.2);vib([60,80,60])}
+}
+function endSound(win,timeout){
+  if(timeout){beep(150,.9,.35,'sawtooth');vib(400)}
+  else if(win){[523,659,784,1046].forEach((f,i)=>beep(f,.25,.25,'triangle',i*.14))}
+  else{[392,330,262].forEach((f,i)=>beep(f,.3,.25,'triangle',i*.18))}
+}
+document.addEventListener('click',initAudio);
 
 function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="card'+(mine?' mine':'')+'">'+(hidden?'?':n)+'</div>').join('')+'</div>'}
 
@@ -89,6 +107,7 @@ function R(){
       h=`${head}<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
       ${cards(mine,true)}
       <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
+      <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>
       <div class="clue">線索：${clue}</div>
       <h2>提交答案：哪一張消失了？</h2>
       <div class="toast">${toast}</div>
@@ -112,21 +131,23 @@ function act(a,v){
   else if(a==='join'){const c=($('code').value||'').trim();
     if(!valid(c)){err='代碼不正確，請對照同伴畫面上的 6 位數再輸入。';R();return}
     S={code:c,role:'B',phase:'lobby',log:[],sel:null,end:0};log('加入房間，我是 B');err=''}
-  else if(a==='start'){S.phase='play';S.end=Date.now()+120000;log('開始計時');toast=''}
+  else if(a==='start'){S.phase='play';S.end=Date.now()+120000;lastSec=-1;initAudio();log('開始計時');toast=''}
   else if(a==='sel'){S.sel=+v;toast=''}
   else if(a==='submit'){if(!S.sel)return;finish(S.sel);return}
   else if(a==='hide'){hidden=!hidden;R();return}
-  else if(a==='reset'){if(S&&S.phase!=='done'&&!confirm('要放棄這局嗎？'))return;S=null;toast='';try{localStorage.removeItem(KEY)}catch(e){}R();return}
+  else if(a==='mute'){muted=!muted;R();return}
+  else if(a==='reset'){if(S&&S.phase!=='done'&&!confirm('要放棄這局嗎？'))return;S=null;toast='';try{store.removeItem(KEY)}catch(e){}R();return}
   save();R()
 }
-function finish(ans){S.phase='done';S.ans=ans;log(ans==null?'時間到，沒有提交答案':'提交答案 '+ans);save();R()}
+function finish(ans){S.phase='done';S.ans=ans;endSound(ans!=null&&ans===deal(S.code).miss,ans==null);log(ans==null?'時間到，沒有提交答案':'提交答案 '+ans);save();R()}
 
 $('app').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset.v)});
 
 setInterval(()=>{
   if(!S||S.phase!=='play')return;
-  const left=S.end-Date.now(),el=$('tm');
+  const left=S.end-Date.now(),el=$('tm'),sec=Math.ceil(left/1000);
   if(left<=0){finish(null);return}
+  if(sec!==lastSec){lastSec=sec;tickSound(sec)}
   if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=20000)}
 },250);
 
@@ -134,7 +155,7 @@ setInterval(()=>{
 (function(){
   const n=+new URLSearchParams(location.search).get('n');
   if(!n)return;
-  try{history.replaceState(null,'',location.pathname)}catch(e){}
+  try{history.replaceState(null,'',location.pathname+(DEV?'?dev':''))}catch(e){}
   if(n<1||n>5)return;
   if(S&&S.phase==='play'){S.sel=n;save();toast='讀到數字 '+n+'，確認後提交'}
   else if(S&&S.phase==='lobby'){toast=''}
