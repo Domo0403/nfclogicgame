@@ -39,6 +39,12 @@ ol{padding-left:1.3em;margin:.4em 0}
 .cards.sm{gap:8px}.cards.sm .card{width:56px;height:80px;font-size:1.9rem;box-shadow:3px 3px 0 var(--accent)}
 .cards.sm .card.mine{box-shadow:3px 3px 0 var(--ok)}.cards.sm .card.gone{box-shadow:none}
 .g4{grid-template-columns:repeat(4,1fr)}.grid button.op{font-size:1rem}
+.card small{display:block;font-size:.85rem;color:var(--mute);font-weight:700;line-height:1}
+.card{align-content:center}
+.ov{position:fixed;inset:0;z-index:10;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));padding-bottom:calc(24px + env(safe-area-inset-bottom));text-align:center;cursor:pointer}
+.ov .pair{font-size:3.4rem;letter-spacing:.3em;color:var(--accent)}
+.ov .big{font-size:6rem;font-weight:800;line-height:1.15}
+.ov button{max-width:340px}
 button:disabled{opacity:.4;cursor:not-allowed}
 details{margin:12px 0}summary{cursor:pointer;color:var(--mute)}
 .err,.toast{min-height:1.5em;color:var(--bad);font-weight:700}
@@ -151,47 +157,52 @@ function finish(ans){S.phase='done';S.ans=ans;endSound(ans!=null&&ans===deal(S.c
 
 // ===== 困難版（單機）=====
 const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
+const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
 function togglePos(p){
   const i=S.sel.indexOf(p);
   if(i>=0)S.sel.splice(i,1);else if(S.sel.length<2)S.sel.push(p);
   S.sel.sort((a,b)=>a-b);
-  toast=S.sel.length?'已選第 '+S.sel.join('、')+' 張':'';
+  toast=S.sel.length?'已選 '+S.sel.map(k=>SYM[k-1]).join(' '):'';
 }
 function scanH(n){
   if(S.phase==='scan'){
     if(S.seq.includes(n)){toast='這張已經掃過了'}
-    else if(S.seq.length<5){S.seq.push(n);toast='已記錄第 '+S.seq.length+' 張'}
+    else if(S.seq.length<5){S.seq.push(n);toast='已記錄 '+SYM[S.seq.length-1]}
   }else if(S.phase==='play'){
     const p=S.seq.indexOf(n)+1;if(p)togglePos(p);
   }
   save();
 }
-function finishH(timeout){S.phase='done';S.timeout=timeout;endSound(!timeout,timeout);log(timeout?'時間到':'提前揭曉');save();R()}
+function finishH(timeout){S.phase='done';S.timeout=timeout;S.pop=null;endSound(!timeout,timeout);log(timeout?'時間到':'提前揭曉');save();R()}
 function actH(a,v){
-  if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,log:[],end:0};log('開始困難版');toast=''}
+  if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,pop:null,log:[],end:0};log('開始困難版');toast=''}
   else if(a==='scanman'){scanH(+v)}
   else if(a==='undo'){S.seq.pop();toast=''}
   else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+180000;lastSec=-1;initAudio();log('開始倒數 3 分鐘');toast=''}
   else if(a==='pos'){togglePos(+v)}
   else if(a==='op'){S.op=v}
+  else if(a==='close'){S.pop=null}
   else if(a==='ask'){
     const o=S.op;
     if(S.sel.length!==2||!o||S.q.length>=5||((o==='sum'||o==='prod')&&spUsed()))return;
     const [x,y]=S.sel,A=S.seq[x-1],B=S.seq[y-1];
-    const t=o==='cmp'?'第 '+(A>B?x:y)+' 張比較大':o==='diff'?'差 '+Math.abs(A-B):o==='sum'?'和 '+(A+B):'積 '+(A*B);
-    S.q.push({x,y,o,t});log('第 '+x+'、'+y+' 張 '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');
+    let t,val;
+    if(o==='cmp'){const big=A>B?x:y,sm=A>B?y:x;t=SYM[big-1]+' 比較大';val=SYM[big-1]+' ＞ '+SYM[sm-1]}
+    else{val=String(o==='diff'?Math.abs(A-B):o==='sum'?A+B:A*B);t=(o==='diff'?'差 ':o==='sum'?'和 ':'積 ')+val}
+    S.q.push({x,y,o,t,v:val});S.pop=S.q.length-1;
+    log(SYM[x-1]+'、'+SYM[y-1]+' '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');vib(60);
   }
   else if(a==='reveal'){if(!confirm('確定要揭曉答案嗎？'))return;finishH(false);return}
   save();R();
 }
-function qlist(){return S.q.length?S.q.map(q=>'<li>第 '+q.x+'、'+q.y+' 張　'+OPN[q.o]+'：<b>'+q.t+'</b></li>').join(''):'<li>還沒有提問</li>'}
+function qlist(){return S.q.length?S.q.map(q=>'<li>'+SYM[q.x-1]+'、'+SYM[q.y-1]+'　'+OPN[q.o]+'：<b>'+q.t+'</b></li>').join(''):'<li>還沒有提問</li>'}
 function RH(){
   const head='<p><span class="role">困難版</span></p>',five=[1,2,3,4,5];
   if(S.phase==='scan'){
     const n=S.seq.length;
-    return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著排成一排，從左到右一張張碰。畫面不會顯示數字。</p>
-    <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+(i<n?'●':'')+'</div>').join('')}</div>
+    return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著，從左到右放在 ${SYM.join(' ')} 的位置，再一張張碰。畫面不會顯示牌上的數字。</p>
+    <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+SYM[i]+'</div>').join('')}</div>
     <div class="toast">${toast}</div>
     ${n===5?'<button data-a="hstart">開始倒數 3 分鐘</button>':''}
     ${n?'<button class="ghost" data-a="undo">重掃上一張</button>':''}
@@ -199,10 +210,16 @@ function RH(){
     <button class="link" data-a="reset">放棄</button>`;
   }
   if(S.phase==='play'){
-    const left=5-S.q.length,sp=spUsed(),ok=S.sel.length===2&&S.op&&left>0;
-    return head+`<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
-    <h2>選兩張牌（左到右第幾張，或直接碰牌）</h2>
-    <div class="grid">${five.map(k=>`<button data-a="pos" data-v="${k}" class="${S.sel.includes(k)?'sel':''}">${k}</button>`).join('')}</div>
+    const left=5-S.q.length,sp=spUsed(),ok=S.sel.length===2&&S.op&&left>0,t=fmt(Math.max(0,S.end-Date.now()));
+    let ov='';
+    if(S.pop!=null&&S.q[S.pop]){const q=S.q[S.pop];
+      ov=`<div class="ov" data-a="close"><div class="timer" id="tm2" style="font-size:2rem;color:var(--mute)">${t}</div>
+      ${q.o==='cmp'?'':`<div class="pair">${SYM[q.x-1]} ${SYM[q.y-1]}</div>`}
+      <div class="sub">${OPN[q.o]}</div><div class="big">${q.v}</div>
+      <button data-a="close">關閉，繼續推理</button></div>`}
+    return head+`<div class="timer" id="tm">${t}</div>
+    <h2>選兩張牌（碰牌，或按符號）</h2>
+    <div class="grid">${five.map(k=>`<button data-a="pos" data-v="${k}" class="${S.sel.includes(k)?'sel':''}" style="font-size:1.6rem">${SYM[k-1]}</button>`).join('')}</div>
     <h2>怎麼問？剩 ${left} 次</h2>
     <div class="grid g4">${Object.keys(OPN).map(o=>`<button class="op ${S.op===o?'sel':''}" data-a="op" data-v="${o}" ${sp&&(o==='sum'||o==='prod')?'disabled':''}>${OPN[o]}</button>`).join('')}</div>
     <p class="sub" style="margin:6px 0">相加、相乘只能擇一，且只能用一次。</p>
@@ -210,11 +227,11 @@ function RH(){
     <button data-a="ask" ${ok?'':'disabled'}>${left?'詢問':'已問完 5 次'}</button>
     <h2>已問過</h2><ul class="log">${qlist()}</ul>
     <button class="ghost" data-a="reveal" style="margin-top:16px">我推完了，揭曉</button>
-    <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>`;
+    <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>${ov}`;
   }
   return head+`<div class="res ${S.timeout?'bad':'ok'}">${S.timeout?'時間到！':'揭曉'}</div>
-  <p class="sub" style="text-align:center">牌的順序（左到右）</p>
-  <div class="cards sm">${S.seq.map(n=>'<div class="card">'+n+'</div>').join('')}</div>
+  <p class="sub" style="text-align:center">每個位置的數字</p>
+  <div class="cards sm">${S.seq.map((n,i)=>'<div class="card"><small>'+SYM[i]+'</small>'+n+'</div>').join('')}</div>
   <p class="sub" style="text-align:center">現在可以把牌翻開對答案。</p>
   <h2>提問紀錄</h2><ul class="log">${qlist()}</ul>
   <button data-a="reset">再玩一局</button>`;
@@ -228,6 +245,7 @@ setInterval(()=>{
   if(left<=0){S.mode==='hard'?finishH(true):finish(null);return}
   if(sec!==lastSec){lastSec=sec;tickSound(sec)}
   if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=10000)}
+  const e2=$('tm2');if(e2)e2.textContent=fmt(left);
 },250);
 
 // NFC 標籤網址：?n=3 會把該數字帶入「提交答案」
