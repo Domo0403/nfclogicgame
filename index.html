@@ -85,8 +85,8 @@ function R(){
   const app=$('app');let h='';
   if(!S){
     h=`<h1>消失的數字</h1>
-    <p class="sub">1 到 5 的數字卡少了一張。兩人合作，在 2 分鐘內推理出消失的是哪一張。</p>
-    <ol><li>一人開新局，另一人輸入代碼加入。</li><li>各自看到自己的兩個數字，不能直接說出數字。</li><li>抽線索卡、自己計算，用奇偶討論。</li><li>兩人一起碰下認為消失的數字卡。</li></ol>
+    <p class="sub">1 到 5 的數字卡少了一張。兩人合作，在 30 秒內推理出消失的是哪一張。</p>
+    <ol><li>一人開新局，另一人輸入代碼加入。</li><li>各自看到自己的兩個數字，不能直接說出數字。</li><li>開始計時後才會出現奇偶線索，搭配線索卡自己計算、討論。</li><li>兩人一起碰下認為消失的數字卡。</li></ol>
     <button data-a="new">開新局（我是 A）</button>
     <div class="row">同伴已經開局？</div>
     <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位數代碼" aria-label="房間代碼">
@@ -97,11 +97,10 @@ function R(){
     const head=`<p><span class="role">玩家 ${S.role}</span> 房間 <b>${S.code}</b></p>`;
     if(S.phase==='lobby'){
       h=`${head}<h1>準備好了嗎？</h1>
-      <p class="sub">你的兩個數字只有你看得到。確認同伴也已加入後，兩人同時按開始。</p>
+      <p class="sub">你的兩個數字只有你看得到。確認同伴也已加入後，兩人同時按開始，奇偶線索會在開始後才出現。</p>
       ${cards(mine,true)}
       <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
-      <div class="clue">線索：${clue}</div>
-      <button data-a="start">開始計時（2 分鐘）</button>
+      <button data-a="start">開始計時（30 秒）</button>
       <button class="link" data-a="reset">放棄這局</button>`;
     }else if(S.phase==='play'){
       h=`${head}<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
@@ -131,7 +130,7 @@ function act(a,v){
   else if(a==='join'){const c=($('code').value||'').trim();
     if(!valid(c)){err='代碼不正確，請對照同伴畫面上的 6 位數再輸入。';R();return}
     S={code:c,role:'B',phase:'lobby',log:[],sel:null,end:0};log('加入房間，我是 B');err=''}
-  else if(a==='start'){S.phase='play';S.end=Date.now()+120000;lastSec=-1;initAudio();log('開始計時');toast=''}
+  else if(a==='start'){S.phase='play';S.end=Date.now()+30000;lastSec=-1;initAudio();log('開始計時');toast=''}
   else if(a==='sel'){S.sel=+v;toast=''}
   else if(a==='submit'){if(!S.sel)return;finish(S.sel);return}
   else if(a==='hide'){hidden=!hidden;R();return}
@@ -148,7 +147,7 @@ setInterval(()=>{
   const left=S.end-Date.now(),el=$('tm'),sec=Math.ceil(left/1000);
   if(left<=0){finish(null);return}
   if(sec!==lastSec){lastSec=sec;tickSound(sec)}
-  if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=20000)}
+  if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=10000)}
 },250);
 
 // NFC 標籤網址：?n=3 會把該數字帶入「提交答案」
