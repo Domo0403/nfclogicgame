@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>消失的數字</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
+@media (prefers-color-scheme:dark){:root{--bg:#152026;--ink:#eef1ea;--card:#22323a;--accent:#b4579f;--gold:#e8b13c;--ok:#5fc287;--bad:#ff7d7d;--mute:#9db0b5}}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 "Avenir Next","Hiragino Maru Gothic ProN","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+main{max-width:480px;margin:0 auto;padding:24px 20px 40px}
+h1{font-size:2.1rem;margin:.2em 0;letter-spacing:.04em}
+h2{font-size:1.1rem;margin:1.4em 0 .4em}
+.sub{color:var(--mute);margin-top:0}
+button{font:inherit;border:0;border-radius:14px;padding:14px 18px;background:var(--accent);color:#fff;font-weight:700;width:100%;margin:8px 0;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink)}
+button.link{background:none;color:var(--mute);font-weight:400;text-decoration:underline;width:auto;padding:8px 0}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+input{font:inherit;font-size:1.5rem;letter-spacing:.3em;text-align:center;width:100%;padding:12px;border-radius:14px;border:2px solid var(--ink);background:var(--card);color:var(--ink)}
+.cards{display:flex;gap:14px;justify-content:center;margin:18px 0}
+.card{width:88px;height:120px;border-radius:12px;background:var(--card);color:var(--ink);border:2px solid var(--ink);display:grid;place-items:center;font-size:3.2rem;font-weight:800;box-shadow:5px 5px 0 var(--accent)}
+.card.gone{border-style:dashed;box-shadow:none;color:var(--mute);background:transparent}
+.card.mine{box-shadow:5px 5px 0 var(--ok)}
+.role{display:inline-block;background:var(--ink);color:var(--bg);border-radius:999px;padding:2px 14px;font-weight:700}
+.code{font-size:2rem;letter-spacing:.2em;font-weight:800}
+.timer{font-size:4.2rem;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;line-height:1.1;margin:8px 0}
+.timer.low{color:var(--bad)}
+.clue{background:var(--gold);color:#2a2000;border-radius:14px;padding:14px 16px;font-weight:700;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.grid button{padding:16px 0;font-size:1.5rem;background:var(--card);color:var(--ink);border:2px solid var(--ink);margin:0}
+.grid button.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+.res{font-size:1.8rem;font-weight:800;text-align:center;margin:12px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+ul.log{padding:0;list-style:none;font-size:.92rem;color:var(--mute);margin:0}
+ul.log li{padding:4px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 15%,transparent)}
+ol{padding-left:1.3em;margin:.4em 0}
+.err,.toast{min-height:1.5em;color:var(--bad);font-weight:700}
+.toast{color:var(--accent)}
+.row{text-align:center;color:var(--mute);margin:16px 0 4px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+const KEY='missing-number-v1';
+let S=load(),hidden=false,err='',toast='';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function chk(s){const d=s.split('').map(Number);return(d[0]*3+d[1]*7+d[2]*3+d[3]*7+d[4]*3)%10}
+function mkCode(){const s=String(Math.floor(Math.random()*100000)).padStart(5,'0');return s+chk(s)}
+function valid(c){return/^\d{6}$/.test(c)&&chk(c.slice(0,5))===+c[5]}
+function rng(seed){let a=(seed*2654435761)>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+function deal(code){const r=rng(parseInt(code.slice(0,5),10)),p=[1,2,3,4,5];
+  for(let i=4;i>0;i--){const j=Math.floor(r()*(i+1));[p[i],p[j]]=[p[j],p[i]]}
+  const s=x=>x.slice().sort((a,b)=>a-b);
+  return{A:s(p.slice(0,2)),B:s(p.slice(2,4)),miss:p[4]}}
+function log(m){S.log.push({t:Date.now(),m})}
+function clock(t){const d=new Date(t);return[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':')}
+function fmt(ms){const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+const $=id=>document.getElementById(id);
+
+function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="card'+(mine?' mine':'')+'">'+(hidden?'?':n)+'</div>').join('')+'</div>'}
+
+function R(){
+  const app=$('app');let h='';
+  if(!S){
+    h=`<h1>消失的數字</h1>
+    <p class="sub">1 到 5 的數字卡少了一張。兩人合作，在 2 分鐘內推理出消失的是哪一張。</p>
+    <ol><li>一人開新局，另一人輸入代碼加入。</li><li>各自看到自己的兩個數字，不能直接說出數字。</li><li>抽線索卡、自己計算，用奇偶討論。</li><li>兩人一起碰下認為消失的數字卡。</li></ol>
+    <button data-a="new">開新局（我是 A）</button>
+    <div class="row">同伴已經開局？</div>
+    <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位數代碼" aria-label="房間代碼">
+    <button class="ghost" data-a="join">輸入代碼加入（我是 B）</button>
+    <div class="err">${err}</div>`;
+  }else{
+    const d=deal(S.code),mine=d[S.role],clue='消失的數字是'+(d.miss%2?'奇數':'偶數');
+    const head=`<p><span class="role">玩家 ${S.role}</span> 房間 <b>${S.code}</b></p>`;
+    if(S.phase==='lobby'){
+      h=`${head}<h1>準備好了嗎？</h1>
+      <p class="sub">你的兩個數字只有你看得到。確認同伴也已加入後，兩人同時按開始。</p>
+      ${cards(mine,true)}
+      <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
+      <div class="clue">線索：${clue}</div>
+      <button data-a="start">開始計時（2 分鐘）</button>
+      <button class="link" data-a="reset">放棄這局</button>`;
+    }else if(S.phase==='play'){
+      h=`${head}<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
+      ${cards(mine,true)}
+      <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
+      <div class="clue">線索：${clue}</div>
+      <h2>提交答案：哪一張消失了？</h2>
+      <div class="toast">${toast}</div>
+      <div class="grid">${[1,2,3,4,5].map(n=>`<button data-a="sel" data-v="${n}" class="${S.sel===n?'sel':''}">${n}</button>`).join('')}</div>
+      <button data-a="submit" ${S.sel?'':'disabled style="opacity:.4"'}>${S.sel?'確認答案：'+S.sel:'先選一個數字'}</button>`;
+    }else{
+      const win=S.ans===d.miss;
+      h=`${head}<div class="res ${win?'ok':'bad'}">${S.ans==null?'時間到！':win?'答對了！':'答錯了'}</div>
+      <p class="sub" style="text-align:center">消失的數字是 ${d.miss}${S.ans!=null&&!win?'，你們選了 '+S.ans:''}</p>
+      <div class="cards">${[1,2,3,4,5].map(n=>`<div class="card${n===d.miss?' gone':''}">${n===d.miss?'?':n}</div>`).join('')}</div>
+      <p class="sub" style="text-align:center">A：${d.A.join('、')}　B：${d.B.join('、')}</p>
+      <h2>推理紀錄</h2><ul class="log">${S.log.map(e=>`<li>${clock(e.t)}　${e.m}</li>`).join('')}</ul>
+      <button data-a="reset">再玩一局</button>`;
+    }
+  }
+  app.innerHTML=h;
+}
+
+function act(a,v){
+  if(a==='new'){S={code:mkCode(),role:'A',phase:'lobby',log:[],sel:null,end:0};log('開新局，我是 A');err=''}
+  else if(a==='join'){const c=($('code').value||'').trim();
+    if(!valid(c)){err='代碼不正確，請對照同伴畫面上的 6 位數再輸入。';R();return}
+    S={code:c,role:'B',phase:'lobby',log:[],sel:null,end:0};log('加入房間，我是 B');err=''}
+  else if(a==='start'){S.phase='play';S.end=Date.now()+120000;log('開始計時');toast=''}
+  else if(a==='sel'){S.sel=+v;toast=''}
+  else if(a==='submit'){if(!S.sel)return;finish(S.sel);return}
+  else if(a==='hide'){hidden=!hidden;R();return}
+  else if(a==='reset'){if(S&&S.phase!=='done'&&!confirm('要放棄這局嗎？'))return;S=null;toast='';try{localStorage.removeItem(KEY)}catch(e){}R();return}
+  save();R()
+}
+function finish(ans){S.phase='done';S.ans=ans;log(ans==null?'時間到，沒有提交答案':'提交答案 '+ans);save();R()}
+
+$('app').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset.v)});
+
+setInterval(()=>{
+  if(!S||S.phase!=='play')return;
+  const left=S.end-Date.now(),el=$('tm');
+  if(left<=0){finish(null);return}
+  if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=20000)}
+},250);
+
+// NFC 標籤網址：?n=3 會把該數字帶入「提交答案」
+(function(){
+  const n=+new URLSearchParams(location.search).get('n');
+  if(!n)return;
+  try{history.replaceState(null,'',location.pathname)}catch(e){}
+  if(n<1||n>5)return;
+  if(S&&S.phase==='play'){S.sel=n;save();toast='讀到數字 '+n+'，確認後提交'}
+  else if(S&&S.phase==='lobby'){toast=''}
+  else if(!S){err='沒有進行中的局，先開新局或輸入代碼。'}
+})();
+R();
+</script>
+</body>
+</html>
