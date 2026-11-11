@@ -36,6 +36,11 @@ input{font:inherit;font-size:1.5rem;letter-spacing:.3em;text-align:center;width:
 ul.log{padding:0;list-style:none;font-size:.92rem;color:var(--mute);margin:0}
 ul.log li{padding:4px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 15%,transparent)}
 ol{padding-left:1.3em;margin:.4em 0}
+.cards.sm{gap:8px}.cards.sm .card{width:56px;height:80px;font-size:1.9rem;box-shadow:3px 3px 0 var(--accent)}
+.cards.sm .card.mine{box-shadow:3px 3px 0 var(--ok)}.cards.sm .card.gone{box-shadow:none}
+.g4{grid-template-columns:repeat(4,1fr)}.grid button.op{font-size:1rem}
+button:disabled{opacity:.4;cursor:not-allowed}
+details{margin:12px 0}summary{cursor:pointer;color:var(--mute)}
 .err,.toast{min-height:1.5em;color:var(--bad);font-weight:700}
 .toast{color:var(--accent)}
 .row{text-align:center;color:var(--mute);margin:16px 0 4px}
@@ -68,7 +73,7 @@ function beep(f,d,v,type,delay){if(muted||!ctx||ctx.state!=='running')return;con
   o.type=type||'sine';o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+d)}
 function vib(p){try{if(!muted&&navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 function tickSound(sec){
-  if(sec>10)beep(520,.04,.05,'square');
+  if(sec>10){if(sec<=30)beep(520,.04,.05,'square')}
   else if(sec>5){beep(660,.09,.2,'square');vib(40)}
   else{beep(880,.09,.28,'square');beep(880,.09,.28,'square',.2);vib([60,80,60])}
 }
@@ -91,8 +96,10 @@ function R(){
     <div class="row">同伴已經開局？</div>
     <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位數代碼" aria-label="房間代碼">
     <button class="ghost" data-a="join">輸入代碼加入（我是 B）</button>
-    <div class="err">${err}</div>`;
-  }else{
+    <div class="err">${err}</div>
+    <div class="row">或單機挑戰</div>
+    <button class="ghost" data-a="hard">困難版：蓋牌排列（單機，3 分鐘）</button>`;
+  }else if(S.mode==='hard'){h=RH()}else{
     const d=deal(S.code),mine=d[S.role],clue='消失的數字是'+(d.miss%2?'奇數':'偶數');
     const head=`<p><span class="role">玩家 ${S.role}</span> 房間 <b>${S.code}</b></p>`;
     if(S.phase==='lobby'){
@@ -126,6 +133,7 @@ function R(){
 }
 
 function act(a,v){
+  if(a==='hard'||(S&&S.mode==='hard'&&!['reset','hide','mute'].includes(a)))return actH(a,v);
   if(a==='new'){S={code:mkCode(),role:'A',phase:'lobby',log:[],sel:null,end:0};log('開新局，我是 A');err=''}
   else if(a==='join'){const c=($('code').value||'').trim();
     if(!valid(c)){err='代碼不正確，請對照同伴畫面上的 6 位數再輸入。';R();return}
@@ -140,12 +148,84 @@ function act(a,v){
 }
 function finish(ans){S.phase='done';S.ans=ans;endSound(ans!=null&&ans===deal(S.code).miss,ans==null);log(ans==null?'時間到，沒有提交答案':'提交答案 '+ans);save();R()}
 
+
+// ===== 困難版（單機）=====
+const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
+function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
+function togglePos(p){
+  const i=S.sel.indexOf(p);
+  if(i>=0)S.sel.splice(i,1);else if(S.sel.length<2)S.sel.push(p);
+  S.sel.sort((a,b)=>a-b);
+  toast=S.sel.length?'已選第 '+S.sel.join('、')+' 張':'';
+}
+function scanH(n){
+  if(S.phase==='scan'){
+    if(S.seq.includes(n)){toast='這張已經掃過了'}
+    else if(S.seq.length<5){S.seq.push(n);toast='已記錄第 '+S.seq.length+' 張'}
+  }else if(S.phase==='play'){
+    const p=S.seq.indexOf(n)+1;if(p)togglePos(p);
+  }
+  save();
+}
+function finishH(timeout){S.phase='done';S.timeout=timeout;endSound(!timeout,timeout);log(timeout?'時間到':'提前揭曉');save();R()}
+function actH(a,v){
+  if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,log:[],end:0};log('開始困難版');toast=''}
+  else if(a==='scanman'){scanH(+v)}
+  else if(a==='undo'){S.seq.pop();toast=''}
+  else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+180000;lastSec=-1;initAudio();log('開始倒數 3 分鐘');toast=''}
+  else if(a==='pos'){togglePos(+v)}
+  else if(a==='op'){S.op=v}
+  else if(a==='ask'){
+    const o=S.op;
+    if(S.sel.length!==2||!o||S.q.length>=5||((o==='sum'||o==='prod')&&spUsed()))return;
+    const [x,y]=S.sel,A=S.seq[x-1],B=S.seq[y-1];
+    const t=o==='cmp'?'第 '+(A>B?x:y)+' 張比較大':o==='diff'?'差 '+Math.abs(A-B):o==='sum'?'和 '+(A+B):'積 '+(A*B);
+    S.q.push({x,y,o,t});log('第 '+x+'、'+y+' 張 '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');
+  }
+  else if(a==='reveal'){if(!confirm('確定要揭曉答案嗎？'))return;finishH(false);return}
+  save();R();
+}
+function qlist(){return S.q.length?S.q.map(q=>'<li>第 '+q.x+'、'+q.y+' 張　'+OPN[q.o]+'：<b>'+q.t+'</b></li>').join(''):'<li>還沒有提問</li>'}
+function RH(){
+  const head='<p><span class="role">困難版</span></p>',five=[1,2,3,4,5];
+  if(S.phase==='scan'){
+    const n=S.seq.length;
+    return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著排成一排，從左到右一張張碰。畫面不會顯示數字。</p>
+    <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+(i<n?'●':'')+'</div>').join('')}</div>
+    <div class="toast">${toast}</div>
+    ${n===5?'<button data-a="hstart">開始倒數 3 分鐘</button>':''}
+    ${n?'<button class="ghost" data-a="undo">重掃上一張</button>':''}
+    <details><summary>沒有 NFC？手動輸入（會看到數字）</summary><div class="grid" style="margin-top:8px">${five.map(k=>`<button data-a="scanman" data-v="${k}" ${S.seq.includes(k)?'disabled':''}>${k}</button>`).join('')}</div></details>
+    <button class="link" data-a="reset">放棄</button>`;
+  }
+  if(S.phase==='play'){
+    const left=5-S.q.length,sp=spUsed(),ok=S.sel.length===2&&S.op&&left>0;
+    return head+`<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
+    <h2>選兩張牌（左到右第幾張，或直接碰牌）</h2>
+    <div class="grid">${five.map(k=>`<button data-a="pos" data-v="${k}" class="${S.sel.includes(k)?'sel':''}">${k}</button>`).join('')}</div>
+    <h2>怎麼問？剩 ${left} 次</h2>
+    <div class="grid g4">${Object.keys(OPN).map(o=>`<button class="op ${S.op===o?'sel':''}" data-a="op" data-v="${o}" ${sp&&(o==='sum'||o==='prod')?'disabled':''}>${OPN[o]}</button>`).join('')}</div>
+    <p class="sub" style="margin:6px 0">相加、相乘只能擇一，且只能用一次。</p>
+    <div class="toast">${toast}</div>
+    <button data-a="ask" ${ok?'':'disabled'}>${left?'詢問':'已問完 5 次'}</button>
+    <h2>已問過</h2><ul class="log">${qlist()}</ul>
+    <button class="ghost" data-a="reveal" style="margin-top:16px">我推完了，揭曉</button>
+    <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>`;
+  }
+  return head+`<div class="res ${S.timeout?'bad':'ok'}">${S.timeout?'時間到！':'揭曉'}</div>
+  <p class="sub" style="text-align:center">牌的順序（左到右）</p>
+  <div class="cards sm">${S.seq.map(n=>'<div class="card">'+n+'</div>').join('')}</div>
+  <p class="sub" style="text-align:center">現在可以把牌翻開對答案。</p>
+  <h2>提問紀錄</h2><ul class="log">${qlist()}</ul>
+  <button data-a="reset">再玩一局</button>`;
+}
+
 $('app').addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b)act(b.dataset.a,b.dataset.v)});
 
 setInterval(()=>{
   if(!S||S.phase!=='play')return;
   const left=S.end-Date.now(),el=$('tm'),sec=Math.ceil(left/1000);
-  if(left<=0){finish(null);return}
+  if(left<=0){S.mode==='hard'?finishH(true):finish(null);return}
   if(sec!==lastSec){lastSec=sec;tickSound(sec)}
   if(el){el.textContent=fmt(left);el.classList.toggle('low',left<=10000)}
 },250);
@@ -156,6 +236,7 @@ setInterval(()=>{
   if(!n)return;
   try{history.replaceState(null,'',location.pathname+(DEV?'?dev':''))}catch(e){}
   if(n<1||n>5)return;
+  if(S&&S.mode==='hard'){scanH(n);return}
   if(S&&S.phase==='play'){S.sel=n;save();toast='讀到數字 '+n+'，確認後提交'}
   else if(S&&S.phase==='lobby'){toast=''}
   else if(!S){err='沒有進行中的局，先開新局或輸入代碼。'}
