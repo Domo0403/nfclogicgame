@@ -45,6 +45,9 @@ ol{padding-left:1.3em;margin:.4em 0}
 .ov .pair{font-size:3.4rem;letter-spacing:.3em;color:var(--accent)}
 .ov .big{font-size:6rem;font-weight:800;line-height:1.15}
 .ov button{max-width:340px}
+.mode{background:var(--card);color:var(--ink);border:2px solid var(--ink);text-align:left;box-shadow:4px 4px 0 var(--accent);margin:16px 0;padding:16px 18px}
+.mode b{display:block;font-size:1.2rem;margin-bottom:2px}.mode span{font-weight:400;color:var(--mute);font-size:.92rem}
+.mode:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--accent)}
 button:disabled{opacity:.4;cursor:not-allowed}
 details{margin:12px 0}summary{cursor:pointer;color:var(--mute)}
 .err,.toast{min-height:1.5em;color:var(--bad);font-weight:700}
@@ -58,7 +61,7 @@ details{margin:12px 0}summary{cursor:pointer;color:var(--mute)}
 const KEY='missing-number-v1';
 const DEV=new URLSearchParams(location.search).has('dev');
 const store=DEV?sessionStorage:localStorage;
-let S=load(),hidden=false,err='',toast='';
+let S=load(),hidden=false,err='',toast='',view='home';
 function load(){try{return JSON.parse(store.getItem(KEY))}catch(e){return null}}
 function save(){try{store.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function chk(s){const d=s.split('').map(Number);return(d[0]*3+d[1]*7+d[2]*3+d[3]*7+d[4]*3)%10}
@@ -98,15 +101,20 @@ function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="car
 
 function R(){
   const app=$('app');let h='';
-  if(!S){
+  if(!S&&view==='home'){
     h=`<h1>消失的數字</h1>
-    <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。</p>
-    <button data-a="phys">簡單版：實體牌（一支手機）</button>
-    <button class="ghost" data-a="hard">困難版：蓋牌排列（單機，3 分鐘）</button>
-    <h2>沒有牌？兩支手機玩簡單版</h2>
+    <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。請選擇玩法：</p>
+    <button class="mode" data-a="phys"><b>簡單版：實體牌</b><span>一支手機・30 秒・手上有題目牌時玩</span></button>
+    <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・3 分鐘・推理 5 張牌的順序</span></button>
+    <button class="mode" data-a="duo"><b>簡單版：兩支手機</b><span>沒有實體牌時玩・各用自己的手機</span></button>
+    <div class="err">${err}</div>`;
+  }else if(!S){
+    h=`<button class="link" data-a="home">← 返回</button>
+    <h1>兩支手機</h1>
     <ol><li>一人開新局，另一人輸入代碼加入。</li><li>各自看到自己的兩個數字，只能說提示牌的結果，不能直接說數字。</li><li>開始計時後才出現奇偶線索和你的提示牌。</li><li>各自選答案，兩人都答對才獲勝。</li></ol>
-    <button class="ghost" data-a="new">開新局（我是 A）</button>
-    <div class="row">同伴已經開局？</div>
+    <h2>我先開局</h2>
+    <button data-a="new">開新局（我是 A）</button>
+    <h2>同伴已經開局</h2>
     <input id="code" inputmode="numeric" maxlength="6" placeholder="6 位數代碼" aria-label="房間代碼">
     <button class="ghost" data-a="join">輸入代碼加入（我是 B）</button>
     <div class="err">${err}</div>`;
@@ -145,6 +153,8 @@ function R(){
 }
 
 function act(a,v){
+  if(a==='duo'){view='duo';err='';R();return}
+  if(a==='home'){view='home';err='';R();return}
   if(a==='phys'||(S&&S.mode==='phys'&&!['reset','mute'].includes(a)))return actP(a,v);
   if(a==='hard'||(S&&S.mode==='hard'&&!['reset','hide','mute'].includes(a)))return actH(a,v);
   if(a==='new'){S={code:mkCode(),role:'A',phase:'lobby',log:[],sel:null,end:0};log('開新局，我是 A');err=''}
@@ -156,7 +166,7 @@ function act(a,v){
   else if(a==='submit'){if(!S.sel)return;finish(S.sel);return}
   else if(a==='hide'){hidden=!hidden;R();return}
   else if(a==='mute'){muted=!muted;R();return}
-  else if(a==='reset'){if(S&&S.phase!=='done'&&!confirm('要放棄這局嗎？'))return;S=null;toast='';try{store.removeItem(KEY)}catch(e){}R();return}
+  else if(a==='reset'){if(S&&S.phase!=='done'&&!confirm('要放棄這局嗎？'))return;S=null;toast='';view='home';try{store.removeItem(KEY)}catch(e){}R();return}
   save();R()
 }
 function finish(ans){S.phase='done';S.ans=ans;endSound(ans!=null&&ans===deal(S.code).miss,ans==null);log(ans==null?'時間到，沒有提交答案':'提交答案 '+ans);save();R()}
