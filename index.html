@@ -209,49 +209,7 @@ function RP(){
 // ===== 困難版（單機）=====
 const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
 const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
-// ===== 困難版（單機）=====
-const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
-const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
-const OPN={cmp:'比大小',diff:'相減',sum:'相加'}; // 已移除 prod（相乘）
-const SYM=['★','●','▲','◆','■'];
-function spUsed(){return S.q.some(x=>x.o==='sum')} // 改為只檢查相加
-function togglePos(p){
-  const i=S.sel.indexOf(p);
-  if(i>=0)S.sel.splice(i,1);else if(S.sel.length<2)S.sel.push(p);
-  S.sel.sort((a,b)=>a-b);
-  toast=S.sel.length?'已選 '+S.sel.map(k=>SYM[k-1]).join(' '):'';
-}
-function scanH(n){
-  if(S.phase==='scan'){
-    if(S.seq.includes(n)){toast='這張已經掃過了'}
-    else if(S.seq.length<5){S.seq.push(n);toast='已記錄 '+SYM[S.seq.length-1]}
-  }else if(S.phase==='play'){
-    const p=S.seq.indexOf(n)+1;if(p)togglePos(p);
-  }
-  save();
-}
-function finishH(timeout){S.phase='done';S.timeout=timeout;S.pop=null;endSound(!timeout,timeout);log(timeout?'時間到':'提前揭曉');save();R()}
-function actH(a,v){
-  if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,pop:null,log:[],end:0};log('開始困難版');toast=''}
-  else if(a==='scanman'){scanH(+v)}
-  else if(a==='undo'){S.seq.pop();toast=''}
-  else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+HARD_SECS*1000;lastSec=-1;initAudio();log('開始倒數 '+HARD_LABEL);toast=''}
-  else if(a==='pos'){togglePos(+v)}
-  else if(a==='op'){S.op=v}
-  else if(a==='close'){S.pop=null}
-  else if(a==='ask'){
-    const o=S.op;
-    if(S.sel.length!==2||!o||S.q.length>=5||(o==='sum'&&spUsed()))return; // 移除相乘限制
-    const [x,y]=S.sel,A=S.seq[x-1],B=S.seq[y-1];
-    let t,val;
-    if(o==='cmp'){const big=A>B?x:y,sm=A>B?y:x;t=SYM[big-1]+' 比較大';val=SYM[big-1]+' ＞ '+SYM[sm-1]}
-    else{val=String(o==='diff'?Math.abs(A-B):A+B);t=(o==='diff'?'差 ':'和 ')+val} // 移除相乘計算
-    S.q.push({x,y,o,t,v:val});S.pop=S.q.length-1;
-    log(SYM[x-1]+'、'+SYM[y-1]+' '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');vib(60);
-  }
-  else if(a==='reveal'){if(!confirm('確定要揭曉答案嗎？'))return;finishH(false);return}
-  save();R();
-}
+const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
 const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
 function togglePos(p){
@@ -299,7 +257,7 @@ function RH(){
     return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著，從左到右放在 ${SYM.join(' ')} 的位置，再一張張碰。畫面不會顯示牌上的數字。</p>
     <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+SYM[i]+'</div>').join('')}</div>
     <div class="toast">${toast}</div>
-    ${n===5?'<button data-a="hstart">開始倒數 ${HARD_LABEL}</button>':''}
+    ${n===5?'<button data-a="hstart">開始倒數 '+HARD_LABEL+'</button>':''}
     ${n?'<button class="ghost" data-a="undo">重掃上一張</button>':''}
     <details><summary>沒有 NFC？手動輸入（會看到數字）</summary><div class="grid" style="margin-top:8px">${five.map(k=>`<button data-a="scanman" data-v="${k}" ${S.seq.includes(k)?'disabled':''}>${k}</button>`).join('')}</div></details>
     <button class="link" data-a="reset">放棄</button>`;
