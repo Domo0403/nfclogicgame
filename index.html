@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NFC數字偵探</title>
+<title>消失的數字</title>
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
@@ -53,7 +53,6 @@ details{margin:12px 0}summary{cursor:pointer;color:var(--mute)}
 .err,.toast{min-height:1.5em;color:var(--bad);font-weight:700}
 .toast{color:var(--accent)}
 .row{text-align:center;color:var(--mute);margin:16px 0 4px}
-.nfc-btn{background:var(--ok);margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -63,8 +62,6 @@ const KEY='missing-number-v1';
 const DEV=new URLSearchParams(location.search).has('dev');
 const store=DEV?sessionStorage:localStorage;
 let S=load(),hidden=false,err='',toast='',view='home';
-let ndefReader=null, nfcActive=false;
-
 function load(){try{return JSON.parse(store.getItem(KEY))}catch(e){return null}}
 function save(){try{store.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function chk(s){const d=s.split('').map(Number);return(d[0]*3+d[1]*7+d[2]*3+d[3]*7+d[4]*3)%10}
@@ -79,7 +76,7 @@ function deal(code){const r=rng(parseInt(code.slice(0,5),10)),p=[1,2,3,4,5];
   return{A:s(p.slice(0,2)),B:s(p.slice(2,4)),miss:p[4],hA:ty[0],hB:ty[1]}}
 const HN={add:'相加',sub:'相減',mul:'相乘',gt3:'超過 3'};
 const HD={add:'算出你兩張牌的和，告訴同伴',sub:'算出你兩張牌的差（大減小），告訴同伴',mul:'算出你兩張牌的乘積，告訴同伴',gt3:'告訴同伴你的牌有幾張超過 3（0、1 或 2）'};
-function log(m){if(S && S.log) S.log.push({t:Date.now(),m})}
+function log(m){S.log.push({t:Date.now(),m})}
 function clock(t){const d=new Date(t);return[d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':')}
 function fmt(ms){const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 const $=id=>document.getElementById(id);
@@ -102,76 +99,15 @@ document.addEventListener('click',initAudio);
 
 function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="card'+(mine?' mine':'')+'">'+(hidden?'?':n)+'</div>').join('')+'</div>'}
 
-// 處理接收到的數字 (來自實體 NFC 晶片讀取、網址參數或手動點擊)
-function handleNFCInput(n) {
-  if (n < 1 || n > 5) return;
-  toast = '成功感應數字：' + n;
-  beep(800, 0.1, 0.3, 'sine');
-  vib([50, 50, 50]);
-
-  if (S && S.mode === 'hard') {
-    scanH(n);
-  } else if (S && S.mode === 'phys') {
-    scanP(n);
-  } else if (S && S.phase === 'play') {
-    S.sel = n;
-    save();
-  } else {
-    err = '目前不在可感應的遊戲環節中';
-  }
-  R();
-}
-
-// 啟動手機原生 Web NFC 掃描
-async function startNFC() {
-  if (!('NDEFReader' in window)) {
-    alert('此瀏覽器不支援 Web NFC（建議使用 Android Chrome，並確認網址為 HTTPS）');
-    return;
-  }
-  try {
-    if (!ndefReader) {
-      ndefReader = new NDEFReader();
-      await ndefReader.scan();
-      ndefReader.onreading = event => {
-        const decoder = new TextDecoder();
-        for (const record of event.records) {
-          if (record.recordType === "text" || record.recordType === "url") {
-            const text = decoder.decode(record.data);
-            // 嘗試從文字或網址中萃取出數字 1~5
-            const match = text.match(/[1-5]/);
-            if (match) {
-              handleNFCInput(parseInt(match[0], 10));
-              return;
-            }
-          }
-        }
-      };
-    }
-    nfcActive = true;
-    toast = 'NFC 讀取已啟動，請將手機靠近卡片';
-    R();
-  } catch (error) {
-    console.error(error);
-    alert('無法啟動 NFC：' + error.message);
-  }
-}
-
 function R(){
   const app=$('app');let h='';
-  
-  // 顯示 NFC 啟動按鈕（若瀏覽器支援）
-  const nfcSupport = ('NDEFReader' in window);
-  const nfcBanner = nfcSupport ? `<button class="nfc-btn" data-a="start-nfc">${nfcActive ? '🟢 NFC 感應中（已啟動）' : '📡 點擊這裡啟動手機 NFC 感應'}</button>` : '';
-
   if(!S&&view==='home'){
     h=`<h1>NFC數字偵探</h1>
     <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。請選擇玩法：</p>
-    ${nfcBanner}
     <button class="mode" data-a="phys"><b>簡單版：實體牌</b><span>一支手機・30 秒・手上有題目牌時玩</span></button>
-    <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・90 秒・推理 5 張牌的順序</span></button>
+    <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・${HARD_LABEL}・推理 5 張牌的順序</span></button>
     <button class="mode" data-a="duo"><b>簡單版：兩支手機</b><span>沒有實體牌時玩・各用自己的手機</span></button>
-    <div class="err">${err}</div>
-    <div class="toast">${toast}</div>`;
+    <div class="err">${err}</div>`;
   }else if(!S){
     h=`<button class="link" data-a="home">← 返回</button>
     <h1>兩支手機</h1>
@@ -188,15 +124,12 @@ function R(){
     if(S.phase==='lobby'){
       h=`${head}<h1>準備好了嗎？</h1>
       <p class="sub">你的兩個數字只有你看得到。確認同伴也已加入後，兩人同時按開始，奇偶線索會在開始後才出現。</p>
-      ${nfcBanner}
       ${cards(mine,true)}
       <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
       <button data-a="start">開始計時（30 秒）</button>
-      <button class="link" data-a="reset">放棄這局</button>
-      <div class="toast">${toast}</div>`;
+      <button class="link" data-a="reset">放棄這局</button>`;
     }else if(S.phase==='play'){
       h=`${head}<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
-      ${nfcBanner}
       ${cards(mine,true)}
       <button class="ghost" data-a="hide">${hidden?'顯示數字':'蓋住數字'}</button>
       <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>
@@ -211,8 +144,8 @@ function R(){
       h=`${head}<div class="res ${win?'ok':'bad'}">${S.ans==null?'時間到！':win?'你答對了！':'答錯了'}</div>
       <p class="sub" style="text-align:center">消失的數字是 ${d.miss}${S.ans!=null&&!win?'，你選了 '+S.ans:''}${win?'。兩人都答對才算獲勝':''}</p>
       <div class="cards">${[1,2,3,4,5].map(n=>`<div class="card${n===d.miss?' gone':''}">${n===d.miss?'?':n}</div>`).join('')}</div>
-      <p class="sub" style="text-align:center">A：${d.A.join('、')} B：${d.B.join('、')}</p>
-      <h2>推理紀錄</h2><ul class="log">${S.log.map(e=>`<li>${clock(e.t)} ${e.m}</li>`).join('')}</ul>
+      <p class="sub" style="text-align:center">A：${d.A.join('、')}　B：${d.B.join('、')}</p>
+      <h2>推理紀錄</h2><ul class="log">${S.log.map(e=>`<li>${clock(e.t)}　${e.m}</li>`).join('')}</ul>
       <button data-a="reset">再玩一局</button>`;
     }
   }
@@ -220,7 +153,6 @@ function R(){
 }
 
 function act(a,v){
-  if(a==='start-nfc'){startNFC();return;}
   if(a==='duo'){view='duo';err='';R();return}
   if(a==='home'){view='home';err='';R();return}
   if(a==='phys'||(S&&S.mode==='phys'&&!['reset','mute'].includes(a)))return actP(a,v);
@@ -254,20 +186,17 @@ function actP(a,v){
   save();R();
 }
 function RP(){
-  const nfcBanner = ('NDEFReader' in window) ? `<button class="nfc-btn" data-a="start-nfc">${nfcActive ? '🟢 NFC 感應中（已啟動）' : '📡 點擊這裡啟動手機 NFC 感應'}</button>` : '';
   const head='<p><span class="role">實體牌版</span></p>';
   if(S.phase==='scan'){
     return head+`<h1>碰剩下那張牌</h1>
     <p class="sub">洗好題目牌（蓋著），雙方各抽 2 張。用手機碰<b>剩下的那一張</b>，不要翻開。碰到的瞬間開始 30 秒倒數。</p>
-    ${nfcBanner}
-    <div class="toast">${toast}</div>
     <details open><summary>沒有 NFC？手動輸入（會看到數字）</summary><div class="grid" style="margin-top:8px">${[1,2,3,4,5].map(k=>`<button data-a="scanman" data-v="${k}">${k}</button>`).join('')}</div></details>
     <button class="link" data-a="reset">放棄</button>`;
   }
   if(S.phase==='play'){
     return head+`<div class="timer" id="tm">${fmt(Math.max(0,S.end-Date.now()))}</div>
     <div class="clue" style="font-size:1.5rem;text-align:center">消失的數字是${S.miss%2?'奇數':'偶數'}</div>
-    <p class="sub">雙方各抽一張提示牌（相加, 相減, 相乘, 超過 3），算出自己兩張牌的結果告訴同伴。不能直接說數字。</p>
+    <p class="sub">雙方各抽一張提示牌（相加、相減、相乘、超過 3），算出自己兩張牌的結果告訴同伴。不能直接說數字。時間到前，各自蓋一張號碼牌當答案。</p>
     <button class="ghost" data-a="finish">提前結束</button>
     <button class="link" data-a="mute">${muted?'開啟音效':'關閉音效'}</button>`;
   }
@@ -278,9 +207,9 @@ function RP(){
 }
 
 // ===== 困難版（單機）=====
-const HARD_SECS=90;
+const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
 const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
-const OPN={cmp:'比大小',diff:'相減',sum:'相加'};
+const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
 const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
 function togglePos(p){
@@ -313,21 +242,19 @@ function actH(a,v){
     const [x,y]=S.sel,A=S.seq[x-1],B=S.seq[y-1];
     let t,val;
     if(o==='cmp'){const big=A>B?x:y,sm=A>B?y:x;t=SYM[big-1]+' 比較大';val=SYM[big-1]+' ＞ '+SYM[sm-1]}
-    else{val=String(o==='diff'?Math.abs(A-B):o==='sum'?A+B:A*B);t=(o==='diff'?'差 ':o==='sum'?'和 ')+val}
+    else{val=String(o==='diff'?Math.abs(A-B):o==='sum'?A+B:A*B);t=(o==='diff'?'差 ':o==='sum'?'和 ':'積 ')+val}
     S.q.push({x,y,o,t,v:val});S.pop=S.q.length-1;
     log(SYM[x-1]+'、'+SYM[y-1]+' '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');vib(60);
   }
   else if(a==='reveal'){if(!confirm('確定要揭曉答案嗎？'))return;finishH(false);return}
   save();R();
 }
-function qlist(){return S.q.length?S.q.map(q=>'<li>'+SYM[q.x-1]+'、'+SYM[q.y-1]+' '+OPN[q.o]+'：<b>'+q.t+'</b></li>').join(''):'<li>還沒有提問</li>'}
+function qlist(){return S.q.length?S.q.map(q=>'<li>'+SYM[q.x-1]+'、'+SYM[q.y-1]+'　'+OPN[q.o]+'：<b>'+q.t+'</b></li>').join(''):'<li>還沒有提問</li>'}
 function RH(){
-  const nfcBanner = ('NDEFReader' in window) ? `<button class="nfc-btn" data-a="start-nfc">${nfcActive ? '🟢 NFC 感應中（已啟動）' : '📡 點擊這裡啟動手機 NFC 感應'}</button>` : '';
   const head='<p><span class="role">困難版</span></p>',five=[1,2,3,4,5];
   if(S.phase==='scan'){
     const n=S.seq.length;
     return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著，從左到右放在 ${SYM.join(' ')} 的位置，再一張張碰。畫面不會顯示牌上的數字。</p>
-    ${nfcBanner}
     <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+SYM[i]+'</div>').join('')}</div>
     <div class="toast">${toast}</div>
     ${n===5?'<button data-a="hstart">開始倒數 '+HARD_LABEL+'</button>':''}
@@ -344,7 +271,6 @@ function RH(){
       <div class="sub">${OPN[q.o]}</div><div class="big">${q.v}</div>
       <button data-a="close">關閉，繼續推理</button></div>`}
     return head+`<div class="timer" id="tm">${t}</div>
-    ${nfcBanner}
     <h2>選兩張牌（碰牌，或按符號）</h2>
     <div class="grid">${five.map(k=>`<button data-a="pos" data-v="${k}" class="${S.sel.includes(k)?'sel':''}" style="font-size:1.6rem">${SYM[k-1]}</button>`).join('')}</div>
     <h2>怎麼問？剩 ${left} 次</h2>
@@ -375,13 +301,17 @@ setInterval(()=>{
   const e2=$('tm2');if(e2)e2.textContent=fmt(left);
 },250);
 
-// 支援網址參數 `?n=X` 讀取
+// NFC 標籤網址：?n=3 會把該數字帶入「提交答案」
 (function(){
   const n=+new URLSearchParams(location.search).get('n');
   if(!n)return;
   try{history.replaceState(null,'',location.pathname+(DEV?'?dev':''))}catch(e){}
   if(n<1||n>5)return;
-  setTimeout(()=>handleNFCInput(n), 300);
+  if(S&&S.mode==='hard'){scanH(n);return}
+  if(S&&S.mode==='phys'){scanP(n);save();return}
+  if(S&&S.phase==='play'){S.sel=n;save();toast='讀到數字 '+n+'，確認後提交'}
+  else if(S&&S.phase==='lobby'){toast=''}
+  else if(!S){err='沒有進行中的局，先開新局或輸入代碼。'}
 })();
 R();
 </script>
