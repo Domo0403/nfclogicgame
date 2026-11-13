@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NFC數字偵探</title>
+<title>消失的數字</title>
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
@@ -102,10 +102,10 @@ function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="car
 function R(){
   const app=$('app');let h='';
   if(!S&&view==='home'){
-    h=`<h1>NFC數字偵探</h1>
+    h=`<h1>消失的數字</h1>
     <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。請選擇玩法：</p>
     <button class="mode" data-a="phys"><b>簡單版：實體牌</b><span>一支手機・30 秒・手上有題目牌時玩</span></button>
-    <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・3 分鐘・推理 5 張牌的順序</span></button>
+    <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・${HARD_LABEL}・推理 5 張牌的順序</span></button>
     <button class="mode" data-a="duo"><b>簡單版：兩支手機</b><span>沒有實體牌時玩・各用自己的手機</span></button>
     <div class="err">${err}</div>`;
   }else if(!S){
@@ -207,6 +207,8 @@ function RP(){
 }
 
 // ===== 困難版（單機）=====
+const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
+const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
 const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
 const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
@@ -230,7 +232,7 @@ function actH(a,v){
   if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,pop:null,log:[],end:0};log('開始困難版');toast=''}
   else if(a==='scanman'){scanH(+v)}
   else if(a==='undo'){S.seq.pop();toast=''}
-  else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+180000;lastSec=-1;initAudio();log('開始倒數 3 分鐘');toast=''}
+  else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+HARD_SECS*1000;lastSec=-1;initAudio();log('開始倒數 '+HARD_LABEL);toast=''}
   else if(a==='pos'){togglePos(+v)}
   else if(a==='op'){S.op=v}
   else if(a==='close'){S.pop=null}
@@ -255,7 +257,7 @@ function RH(){
     return head+`<h1>依序掃描牌</h1><p class="sub">牌洗好、蓋著，從左到右放在 ${SYM.join(' ')} 的位置，再一張張碰。畫面不會顯示牌上的數字。</p>
     <div class="cards sm">${[0,1,2,3,4].map(i=>'<div class="card '+(i<n?'mine':'gone')+'">'+SYM[i]+'</div>').join('')}</div>
     <div class="toast">${toast}</div>
-    ${n===5?'<button data-a="hstart">開始倒數 3 分鐘</button>':''}
+    ${n===5?'<button data-a="hstart">開始倒數 ${HARD_LABEL}</button>':''}
     ${n?'<button class="ghost" data-a="undo">重掃上一張</button>':''}
     <details><summary>沒有 NFC？手動輸入（會看到數字）</summary><div class="grid" style="margin-top:8px">${five.map(k=>`<button data-a="scanman" data-v="${k}" ${S.seq.includes(k)?'disabled':''}>${k}</button>`).join('')}</div></details>
     <button class="link" data-a="reset">放棄</button>`;
