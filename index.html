@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>消失的數字</title>
+<title>NFC數字偵探</title>
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
@@ -102,7 +102,7 @@ function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="car
 function R(){
   const app=$('app');let h='';
   if(!S&&view==='home'){
-    h=`<h1>消失的數字</h1>
+    h=`<h1>NFC數字偵探</h1>
     <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。請選擇玩法：</p>
     <button class="mode" data-a="phys"><b>簡單版：實體牌</b><span>一支手機・30 秒・手上有題目牌時玩</span></button>
     <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・90 秒・推理 5 張牌的順序</span></button>
@@ -209,7 +209,49 @@ function RP(){
 // ===== 困難版（單機）=====
 const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
 const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
-const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
+// ===== 困難版（單機）=====
+const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
+const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
+const OPN={cmp:'比大小',diff:'相減',sum:'相加'}; // 已移除 prod（相乘）
+const SYM=['★','●','▲','◆','■'];
+function spUsed(){return S.q.some(x=>x.o==='sum')} // 改為只檢查相加
+function togglePos(p){
+  const i=S.sel.indexOf(p);
+  if(i>=0)S.sel.splice(i,1);else if(S.sel.length<2)S.sel.push(p);
+  S.sel.sort((a,b)=>a-b);
+  toast=S.sel.length?'已選 '+S.sel.map(k=>SYM[k-1]).join(' '):'';
+}
+function scanH(n){
+  if(S.phase==='scan'){
+    if(S.seq.includes(n)){toast='這張已經掃過了'}
+    else if(S.seq.length<5){S.seq.push(n);toast='已記錄 '+SYM[S.seq.length-1]}
+  }else if(S.phase==='play'){
+    const p=S.seq.indexOf(n)+1;if(p)togglePos(p);
+  }
+  save();
+}
+function finishH(timeout){S.phase='done';S.timeout=timeout;S.pop=null;endSound(!timeout,timeout);log(timeout?'時間到':'提前揭曉');save();R()}
+function actH(a,v){
+  if(a==='hard'){S={mode:'hard',phase:'scan',seq:[],q:[],sel:[],op:null,pop:null,log:[],end:0};log('開始困難版');toast=''}
+  else if(a==='scanman'){scanH(+v)}
+  else if(a==='undo'){S.seq.pop();toast=''}
+  else if(a==='hstart'){if(S.seq.length<5)return;S.phase='play';S.end=Date.now()+HARD_SECS*1000;lastSec=-1;initAudio();log('開始倒數 '+HARD_LABEL);toast=''}
+  else if(a==='pos'){togglePos(+v)}
+  else if(a==='op'){S.op=v}
+  else if(a==='close'){S.pop=null}
+  else if(a==='ask'){
+    const o=S.op;
+    if(S.sel.length!==2||!o||S.q.length>=5||(o==='sum'&&spUsed()))return; // 移除相乘限制
+    const [x,y]=S.sel,A=S.seq[x-1],B=S.seq[y-1];
+    let t,val;
+    if(o==='cmp'){const big=A>B?x:y,sm=A>B?y:x;t=SYM[big-1]+' 比較大';val=SYM[big-1]+' ＞ '+SYM[sm-1]}
+    else{val=String(o==='diff'?Math.abs(A-B):A+B);t=(o==='diff'?'差 ':'和 ')+val} // 移除相乘計算
+    S.q.push({x,y,o,t,v:val});S.pop=S.q.length-1;
+    log(SYM[x-1]+'、'+SYM[y-1]+' '+OPN[o]+'：'+t);S.sel=[];S.op=null;toast='';beep(740,.08,.2,'triangle');vib(60);
+  }
+  else if(a==='reveal'){if(!confirm('確定要揭曉答案嗎？'))return;finishH(false);return}
+  save();R();
+}
 const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
 function togglePos(p){
