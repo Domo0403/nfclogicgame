@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>NFC數位偵探</title>
+<title>NFC數字偵探</title>
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
@@ -102,7 +102,7 @@ function cards(arr,mine){return'<div class="cards">'+arr.map(n=>'<div class="car
 function R(){
   const app=$('app');let h='';
   if(!S&&view==='home'){
-    h=`<h1>消失的數字</h1>
+    h=`<h1>NFC數字偵探</h1>
     <p class="sub">1 到 5 的數字卡少了一張，兩人合作推理出來。請選擇玩法：</p>
     <button class="mode" data-a="phys"><b>簡單版：實體牌</b><span>一支手機・30 秒・手上有題目牌時玩</span></button>
     <button class="mode" data-a="hard"><b>困難版：蓋牌排列</b><span>一支手機・3 分鐘・推理 5 張牌的順序</span></button>
