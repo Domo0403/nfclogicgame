@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>消失的數字</title>
+<title>NFC數字偵探</title>
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light dark;--bg:#e8ece3;--ink:#1d2a2f;--card:#fffdf7;--accent:#6b2d5c;--gold:#e8b13c;--ok:#2b7a4b;--bad:#b23a3a;--mute:#5f6e72}
@@ -209,7 +209,7 @@ function RP(){
 // ===== 困難版（單機）=====
 const HARD_SECS=90; // 困難版倒數秒數，想改時間只要改這個數字
 const HARD_LABEL=HARD_SECS%60?HARD_SECS+' 秒':HARD_SECS/60+' 分鐘';
-const OPN={cmp:'比大小',diff:'相減',sum:'相加',prod:'相乘'};
+const OPN={cmp:'比大小',diff:'相減',sum:'相加'};
 const SYM=['★','●','▲','◆','■'];
 function spUsed(){return S.q.some(x=>x.o==='sum'||x.o==='prod')}
 function togglePos(p){
@@ -275,7 +275,7 @@ function RH(){
     <div class="grid">${five.map(k=>`<button data-a="pos" data-v="${k}" class="${S.sel.includes(k)?'sel':''}" style="font-size:1.6rem">${SYM[k-1]}</button>`).join('')}</div>
     <h2>怎麼問？剩 ${left} 次</h2>
     <div class="grid g4">${Object.keys(OPN).map(o=>`<button class="op ${S.op===o?'sel':''}" data-a="op" data-v="${o}" ${sp&&(o==='sum'||o==='prod')?'disabled':''}>${OPN[o]}</button>`).join('')}</div>
-    <p class="sub" style="margin:6px 0">相加、相乘只能擇一，且只能用一次。</p>
+    <p class="sub" style="margin:6px 0">相加只能用一次。</p>
     <div class="toast">${toast}</div>
     <button data-a="ask" ${ok?'':'disabled'}>${left?'詢問':'已問完 5 次'}</button>
     <h2>已問過</h2><ul class="log">${qlist()}</ul>
